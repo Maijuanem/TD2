@@ -1,0 +1,148 @@
+version1
+ Created on: 22 ago. 2020
+     Author: Juan 
+/*
+7- Investigue como realizar la lectura de un teclado matricial de 4x4, es decir de 16 teclas,
+	e implemente una función que permita leer la tecla presionada. Se deben utilizar las
+	interrupciones externas.
+
+8- En base al ejercicio anterior implemente un panel de alarma básico que cumpla con el
+	siguiente funcionamiento:
+		 Una vez iniciado el sistema la alarma debe estar en estado DESARMADO,
+		indicado con un LED a tal fin.
+		 Si se escribe el código correcto de 4 dígitos y se presiona la tecla ARMAR, la
+		alarma pasa a estado ARMADO, encendiendo un LED indicador y apagando el
+		LED anterior. Caso contrario enciende un led de error quedando a la espera de
+		un nuevo código.
+		 Si en estado ARMADO se escribe el código correcto y se presiona la tecla
+		DESARMAR, la alarma pasa a estado DESARMADO encendiendo el LED
+		apropiado. Caso contrario enciende un led de error quedando a la espera de un
+		nuevo código. Si se ingresa el código de forma incorrecta por tercera vez
+		consecutiva, la alarma debe comenzar a sonar lo cual se indicara con un led a
+		tal fin.
+ */
+
+#include <avr/io.h>
+#include <avr/interrupt.h>
+#include <util/delay.h>
+#include <stdio.h>
+#include "MyDefs.h"
+#include "MyInt.h"
+
+char pass[5],valid[5]="2020";
+unsigned char i,tecla,estado=0,n=0,o=0;
+void validar(void);
+void stat(unsigned char);
+ISR(INT7_vect){
+	if(PORTD == 0x10)	pass[n]='/';//tecla=15;
+	if(PORTD == 0x20)	pass[n]='x';//tecla=11;
+	if(PORTD == 0x40)	pass[n]='-';//tecla=7;
+	if(PORTD == 0x80)	pass[n]='+';//tecla=3;
+	n++;
+	while(!TestBit(PINE,7));
+
+}
+ISR(INT6_vect){
+	if(PORTD == 0x10)	pass[n]='9';//tecla=14;
+	if(PORTD == 0x20)	pass[n]='6';//tecla=10;
+	if(PORTD == 0x40)	pass[n]='3';//tecla=6;
+	if(PORTD == 0x80)	pass[n]='=';//tecla=2;
+	n++;
+	while(!TestBit(PINE,6));
+}
+ISR(INT5_vect){
+	if(PORTD == 0x10)	pass[n]='8';//tecla=13;
+	if(PORTD == 0x20)	pass[n]='5';//tecla=9;
+	if(PORTD == 0x40)	pass[n]='2';//tecla=5;
+	if(PORTD == 0x80)	pass[n]='0';//tecla=1;
+	n++;
+	while(!TestBit(PINE,5));
+}
+ISR(INT4_vect){
+	if(PORTD == 0x10)	pass[n]='7';//tecla=12;
+	if(PORTD == 0x20)	pass[n]='4';//tecla=8;
+	if(PORTD == 0x40)	pass[n]='1';//tecla=4;
+	if(PORTD == 0x80){
+		pass[n]='\0';//tecla=0;
+		validar();
+	}
+	n++;
+	while(!TestBit(PINE,4));
+}
+
+int main(void)
+{
+	DDRD=0xF0;
+	PORTD=0x10;
+	DDRE|= (1<<0)|(1<<1)|(1<<2)|(1<<3);
+	SET_INT4567_ON;
+	SET_INT4_FALLING;
+	SET_INT5_FALLING;
+	SET_INT6_FALLING;
+	SET_INT7_FALLING;
+	estado=0;
+	stat(0);
+	sei();
+	while(1)
+	{
+		PORTD=i;
+		i=(i<<1);
+		if(i==0x00) i=0x10;
+		_delay_ms(10);
+	}
+}
+void validar(){
+	if(!strcmp(pass,valid)){
+		switch(estado){
+		case 0:
+			estado=1;
+			stat(1);
+			n=0;
+			break;
+		case 1:
+			estado=0;
+			stat(0);
+			n=0;
+			break;
+		}
+	}else{
+		o++;
+		if(o>2){
+			estado=3;
+			stat(3);
+			while(1);
+			n=0;
+		}else{
+			estado=2;
+			stat(2);
+			n=0;
+		}
+	}
+}
+void stat(unsigned char s){
+	if(s==0) {
+		PORTE|= (1<<0)|(1<<1)|(1<<2)|(1<<3);
+		PORTE&=~(1<<0);
+	}
+	if(s==1) {
+		PORTE|= (1<<0)|(1<<1)|(1<<2)|(1<<3);
+		PORTE&=~(1<<1);
+	}
+	if(s==2) {
+		//PORTE|= (1<<0)|(1<<1)|(1<<2)|(1<<3);
+		PORTE&=~(1<<2);
+	}
+	if(s==3) {
+		PORTE|= (1<<0)|(1<<1)|(1<<2)|(1<<3);
+		PORTE&=~(1<<3);
+	}
+
+}
+
+/*
+ * PE0--> ALARMADO 			--> estado=0
+ * PE1--> DESALARMADO		--> estado=1
+ * PE2--> CODIGO INCORRECTO --> estado=2
+ * PE3--> ALARMA SONORA		--> estado=3
+ */
+     
